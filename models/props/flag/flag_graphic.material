@@ -1,5 +1,0 @@
-shader = "models/Model.surface_shader"
-albedoMap = "models/props/flag/flag_graphic.dds"
-//normalMap = "models/props/flag/flag_normal.dds"
-//emissiveMap = "models/props/flag/flag_illum.dds"
-

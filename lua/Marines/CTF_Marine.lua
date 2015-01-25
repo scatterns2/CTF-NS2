@@ -114,7 +114,7 @@ function Marine:Buy()
     if self:GetIsLocalPlayer() then
     
         // The Embryo cannot use the buy menu in any case.
-        if self:GetTeamNumber() ~= 0  then
+        if self:GetTeamNumber() ~= 0  and not self:isBearingFlag() then
         
             if not self.buyMenu  then
             

@@ -6,7 +6,7 @@ function Alien:Buy()
     if self:GetIsLocalPlayer() then
     
         // The Embryo cannot use the buy menu in any case.
-        if self:GetTeamNumber() ~= 0 and not self:isa("Embryo") and not self.hasFlag then
+        if self:GetTeamNumber() ~= 0 and not self:isa("Embryo") and not self:isBearingFlag() then
         
             if not self.buyMenu then
             

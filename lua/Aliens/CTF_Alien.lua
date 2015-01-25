@@ -12,6 +12,6 @@ AddMixinNetworkVars(FlagBearerMixin, networkVars)
 
 local orig_Alien_OnInitialized = Alien.OnInitialized
 function Alien:OnInitialized()
-    orig_Alien_OnInitialized(self)
     InitMixin(self, FlagBearerMixin)
+    orig_Alien_OnInitialized(self)
 end

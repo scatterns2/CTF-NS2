@@ -70,10 +70,6 @@ function MarineTeam:Initialize(teamName, teamNumber)
     self.updateMarineArmor = false
     
     self.lastTimeNoIPsMessageSent = Shared.GetTime()
-	
-	self.clientOwnedStructures = { }
-	
-	self.infectionModePlayersAllowed = Server.GetMaxPlayers() - 1
     
 end
 
@@ -166,7 +162,6 @@ function MarineTeam:UpdateGameMasks(timePassed)
         
     end
     
-    /*
     for playerIndex, player in ipairs(self:GetPlayers()) do
     
         if player:GetGameEffectMask(kGameEffect.Beacon) ~= beaconState then
@@ -174,7 +169,6 @@ function MarineTeam:UpdateGameMasks(timePassed)
         end
         
     end
-    */
     
 end
 
@@ -204,28 +198,28 @@ local function SpawnInfantryPortal(self, techPoint)
     
     // First check the predefined spawn points. Look for a close one.
     for p = 1, #Server.infantryPortalSpawnPoints do
-    
+		
 		if not takenInfantryPortalPoints[p] then 
-        local predefinedSpawnPoint = Server.infantryPortalSpawnPoints[p]
-        if (predefinedSpawnPoint - techPointOrigin):GetLength() <= kInfantryPortalAttachRange then
-            spawnPoint = predefinedSpawnPoint
+			local predefinedSpawnPoint = Server.infantryPortalSpawnPoints[p]
+			if (predefinedSpawnPoint - techPointOrigin):GetLength() <= kInfantryPortalAttachRange then
+				spawnPoint = predefinedSpawnPoint
 				takenInfantryPortalPoints[p] = true
 				break
-        end
+			end
 		end
         
     end
     
     if not spawnPoint then
-    
+		
         spawnPoint = GetRandomBuildPosition( kTechId.InfantryPortal, techPointOrigin, kInfantryPortalAttachRange )
         spawnPoint = spawnPoint and spawnPoint - Vector( 0, 0.6, 0 )
-        
-            end
-            
+		
+    end
+    
     if spawnPoint then
     
-        local ip = CreateEntity(Flag.kMapName, spawnPoint, self:GetTeamNumber())
+        local ip = CreateEntity(InfantryPortal.kMapName, spawnPoint, self:GetTeamNumber())
         
         SetRandomOrientation(ip)
         ip:SetConstructionComplete()
@@ -263,14 +257,15 @@ function MarineTeam:Update(timePassed)
     
     // Update distress beacon mask
     self:UpdateGameMasks(timePassed)    
+
+    if GetGamerules():GetGameStarted() then
+        CheckForNoIPs(self)
+    end
     
-	// NOT NEEDED IN COMBAT
-	/* 
     local armorLevel = GetArmorLevel(self)
     for index, player in ipairs(GetEntitiesForTeam("Player", self:GetTeamNumber())) do
         player:UpdateArmorAmount(armorLevel)
     end
-	*/
     
 end
 
@@ -306,14 +301,6 @@ function MarineTeam:InitTechTree()
     self.techTree:AddBuildNode(kTechId.ArmsLab,                   kTechId.CommandStation,                kTechId.None)  
     self.techTree:AddManufactureNode(kTechId.MAC,                 kTechId.RoboticsFactory,                kTechId.None,  true) 
 
-	self.techTree:AddAction(kTechId.Medic,                     kTechId.None,                kTechId.None)
-    self.techTree:AddAction(kTechId.Assault,                     kTechId.None,                kTechId.None)
-    self.techTree:AddAction(kTechId.Engineer,                      kTechId.None,                kTechId.None)
-    self.techTree:AddAction(kTechId.Scout,                      kTechId.None,                kTechId.None)
-	
-	
-	
-	
     self.techTree:AddBuyNode(kTechId.Axe,                         kTechId.None,              kTechId.None)
     self.techTree:AddBuyNode(kTechId.Pistol,                      kTechId.None,                kTechId.None)
     self.techTree:AddBuyNode(kTechId.Rifle,                       kTechId.None,                kTechId.None)
@@ -388,8 +375,8 @@ function MarineTeam:InitTechTree()
     self.techTree:AddTargetedBuyNode(kTechId.LayMines,          kTechId.MinesTech,        kTechId.None)
     self.techTree:AddTargetedActivation(kTechId.DropMines,      kTechId.MinesTech,        kTechId.None)
     
-    self.techTree:AddTargetedBuyNode(kTechId.Welder,          kTechId.Armory,        kTechId.None)
-    self.techTree:AddTargetedActivation(kTechId.DropWelder,   kTechId.Armory,        kTechId.None)
+    self.techTree:AddTargetedBuyNode(kTechId.Welder,          kTechId.None,        kTechId.None)
+    self.techTree:AddTargetedActivation(kTechId.DropWelder,   kTechId.None,        kTechId.None)
     
     // ARCs
     self.techTree:AddBuildNode(kTechId.RoboticsFactory,                    kTechId.InfantryPortal,                 kTechId.None)  
@@ -435,213 +422,17 @@ function MarineTeam:InitTechTree()
 
 end
 
-local function SpawnMarineStructure(self, techPoint, techId, mapName, spawnPointsTable, maxRange)
-
-	local techPointOrigin = techPoint:GetOrigin() + Vector(0, 2, 0)
-	local newStructureExtents = LookupTechData(kTechId.Marine, kTechDataMaxExtents)
-	local newStructureHeight = newStructureExtents.y
-	local newStructureWidth = math.max(newStructureExtents.x, newStructureExtents.z)
-	
-	local spawnPoint = nil
-	
-	// First check the predefined spawn points. Look for a close one.
-	for p = 1, #spawnPointsTable do
-	
-		local predefinedSpawnPoint = spawnPointsTable[p]
-		if (predefinedSpawnPoint - techPointOrigin):GetLength() <= maxRange then
-			spawnPoint = predefinedSpawnPoint
-		end
-		
-	end
-	
-	// Fallback on the random method if there is no nearby spawn point.
-	if not spawnPoint then
-	
-		for i = 1, 100 do
-		
-			local origin = GetRandomSpawnForCapsule(newStructureHeight, newStructureWidth, techPointOrigin + Vector(0, 0.4, 0), kInfantryPortalMinSpawnDistance, maxRange, EntityFilterAll())
-			
-			if origin then
-				origin = GetGroundAtPosition(origin, nil, PhysicsMask.AllButPCs, newStructureExtents)
-				spawnPoint = origin - Vector(0, 0.1, 0)
-			end
-			
-		end
-		
-	end
-	
-	if spawnPoint then
-	
-		local structure = CreateEntity(mapName, spawnPoint, self:GetTeamNumber())
-		
-		SetRandomOrientation(structure)
-		structure:SetConstructionComplete()
-		
-	end
-	
-end
-
-function MarineTeam:GetNumDroppedStructures(player, techId)
-
-    local structureTypeTable = self:GetDroppedMarineStructures(player, techId)
-    return (not structureTypeTable and 0) or #structureTypeTable
-    
-end
-
-local function RemoveMarineStructureFromClient(self, techId, clientId)
-
-    local structureTypeTable = self.clientOwnedStructures[clientId]
-    
-    if structureTypeTable then
-    
-        if not structureTypeTable[techId] then
-        
-            structureTypeTable[techId] = { }
-            return
-            
-        end    
-        
-        local removeIndex = 0
-        local structure = nil
-        for index, id in ipairs(structureTypeTable[techId])  do
-        
-            if id then
-            
-                removeIndex = index
-                structure = Shared.GetEntity(id)
-                break
-                
-            end
-            
-        end
-        
-        if structure then
-        
-            table.remove(structureTypeTable[techId], removeIndex)
-            structure.consumed = true
-            if structure:GetCanDie() then
-                structure:Kill()
-            else
-                DestroyEntity(structure)
-            end
-            
-        end
-        
-    end
-    
-end
-
-function MarineTeam:AddMarineStructure(player, structure)
-
-    if player ~= nil and structure ~= nil then
-    
-        local clientId = Server.GetOwner(player):GetUserId()
-        local structureId = structure:GetId()
-        local techId = structure:GetTechId()
-
-        if not self.clientOwnedStructures[clientId] then
-            self.clientOwnedStructures[clientId] = { }
-        end
-        
-        local structureTypeTable = self.clientOwnedStructures[clientId]
-        
-        if not structureTypeTable[techId] then
-            structureTypeTable[techId] = { }
-        end
-        
-        table.insertunique(structureTypeTable[techId], structureId)
-        
-        local numAllowedStructure = LookupTechData(techId, kTechDataMaxAmount, -1) //* self:GetNumHives()
-        
-        if numAllowedStructure >= 0 and table.count(structureTypeTable[techId]) > numAllowedStructure then
-            RemoveMarineStructureFromClient(self, techId, clientId)
-        end
-        
-    end
-    
-end
-
-function MarineTeam:GetDroppedMarineStructures(player, techId)
-
-    local owner = Server.GetOwner(player)
-
-    if owner then
-    
-        local clientId = owner:GetUserId()
-        local structureTypeTable = self.clientOwnedStructures[clientId]
-        
-        if structureTypeTable then
-            return structureTypeTable[techId]
-        end
-    
-    end
-    
-end
-
-function MarineTeam:GetNumDroppedMarineStructures(player, techId)
-
-    local structureTypeTable = self:GetDroppedMarineStructures(player, techId)
-    return (not structureTypeTable and 0) or #structureTypeTable
-    
-end
-
-function MarineTeam:UpdateClientOwnedStructures(oldEntityId)
-
-    if oldEntityId then
-    
-        for clientId, structureTypeTable in pairs(self.clientOwnedStructures) do
-        
-            for techId, structureList in pairs(structureTypeTable) do
-            
-                for i, structureId in ipairs(structureList) do
-                
-                    if structureId == oldEntityId then
-                    
-                        table.remove(structureList, i)
-                        break
-                        
-                    end
-                    
-                end
-                
-            end
-            
-        end
-        
-    end
-
-end
-
-function MarineTeam:OnEntityChange(oldEntityId, newEntityId)
-
-    PlayingTeam.OnEntityChange(self, oldEntityId, newEntityId)
-
-    // Check if the oldEntityId matches any client's built structure and
-    // handle the change.
-    
-    self:UpdateClientOwnedStructures(oldEntityId)
-
-end
-
-function MarineTeam:ShouldSpawnCommandStructure()
-	return GetGamerulesInfo():GetStartWithCommandChair()
-end
-
 function MarineTeam:SpawnInitialStructures(techPoint)
 
     local tower, commandStation = PlayingTeam.SpawnInitialStructures(self, techPoint)
-		
-	// Combat: Change initial structures 
-	if GetGamerulesInfo():GetStartWithArmory() then
-		SpawnMarineStructure(self, techPoint, kTechId.Armory, Armory.kMapName, Server.armorySpawnPoints, kSpawnMaxDistance)
-	end
-	
-	if GetGamerulesInfo():GetStartWithPhaseGate() then
-		SpawnMarineStructure(self, techPoint, kTechId.PhaseGate, PhaseGate.kMapName, Server.phaseGateSpawnPoints, kSpawnMaxDistance)
-	end
+    
+    SpawnInfantryPortal(self, techPoint)
+    // Spawn a second IP when marines have 9 or more players
+    if self:GetNumPlayers() > 8 then
+        SpawnInfantryPortal(self, techPoint)
+    end
 
-	// COMBAT MODE: NO!
-    /*if Shared.GetCheatsEnabled() and MarineTeam.gSandboxMode then
+    if Shared.GetCheatsEnabled() and MarineTeam.gSandboxMode then
 
         // Pretty dumb way of spawning two things..heh
         local origin = techPoint:GetOrigin()
@@ -650,9 +441,7 @@ function MarineTeam:SpawnInitialStructures(techPoint)
         CreateEntity( AdvancedArmory.kMapName, origin+right*3.5+forward*1.5, kMarineTeamType)
         CreateEntity( PrototypeLab.kMapName, origin+right*3.5-forward*1.5, kMarineTeamType)
 
-    end*/
-	
-	self.ipsToConstruct = 0
+    end
     
     return tower, commandStation
     

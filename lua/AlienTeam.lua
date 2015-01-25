@@ -50,8 +50,6 @@ function AlienTeam:Initialize(teamName, teamNumber)
     self.bioMassAlertLevel = 0
     self.maxBioMassLevel = 0
     self.bioMassFraction = 0
-	
-	self.infectionModePlayersAllowed = 1
     
 end
 
@@ -73,16 +71,6 @@ end
 
 function AlienTeam:GetTeamInfoMapName()
     return AlienTeamInfo.kMapName
-end
-
-function AlienTeam:GetDefaultSpawnMapName()
-
-	if self:GetNumPlayers() <= 1 and GetGamerulesInfo():GetGameType() == kCombatGameType.Infection then
-		return Fade.kMapName
-	else
-		return PlayingTeam.GetDefaultSpawnMapName(self)
-	end
-
 end
 
 function AlienTeam:GetEggCount()
@@ -290,7 +278,7 @@ function AlienTeam:AddGorgeStructure(player, structure)
         table.insertunique(structureTypeTable[techId], structureId)
         
         ApplyGorgeStructureTheme(structure, player)
-        
+        ------------------CONSUME PROBLEM HERE
         local numAllowedStructure = LookupTechData(techId, kTechDataMaxAmount, -1) //* self:GetNumHives()
         
         if numAllowedStructure >= 0 and table.count(structureTypeTable[techId]) > numAllowedStructure then
@@ -298,7 +286,6 @@ function AlienTeam:AddGorgeStructure(player, structure)
         end
         
     end
-    
 end
 
 function AlienTeam:GetDroppedGorgeStructures(player, techId)
@@ -386,95 +373,19 @@ local function CreateCysts(hive, harvester, teamNumber)
     
 end
 
-// Function to spawn alien buildings.
-local function SpawnAlienBuilding(self, techPoint, techId, mapName, techPointList)
-
-	local techPointOrigin = techPoint:GetOrigin() + Vector(0, 2, 0)
-	local spawnPoint = nil
-	
-	// Spawn the nearest crag spawn point close to the hive.
-	local shortestDistance = 9999
-	if techPointList then
-		for c = 1, #techPointList do
-		
-			local thisSpawnPoint = techPointList[c]
-			if (thisSpawnPoint - techPointOrigin):GetLength() <= shortestDistance then
-			
-				spawnPoint = thisSpawnPoint
-				
-			end
-			
-		end
-	end
-
-	if spawnPoint == nil then
-		for i = 1, 50 do
-
-			local origin = CalculateRandomSpawn(nil, techPointOrigin, techId, true, kInfantryPortalMinSpawnDistance * 1, kInfantryPortalMinSpawnDistance * 2.5, 3)
-
-			if origin then
-				spawnPoint = origin - Vector(0, 0.1, 0)
-			end
-
-		end
-	end
-
-	if spawnPoint then
-
-		local alienStructure = CreateEntity(mapName, spawnPoint, self:GetTeamNumber())
-
-		SetRandomOrientation(alienStructure)
-		alienStructure:SetConstructionComplete()
-		//alienStructure:SetMature()
-
-	end
-
-end
-
-function AlienTeam:ShouldSpawnCommandStructure()
-	return GetGamerulesInfo():GetStartWithHive()
-end
-
 function AlienTeam:SpawnInitialStructures(techPoint)
 
     local tower, hive = PlayingTeam.SpawnInitialStructures(self, techPoint)
     
-	if hive then
-		hive:SetFirstLogin()
-	end
-	//COMBAT: Remove infestation
-    //hive:SetInfestationFullyGrown()
-	
-	// Make a crag and shift near the aliens.
-	if GetGamerulesInfo():GetStartWithCrag() then
-		SpawnAlienBuilding(self, techPoint, kTechId.Crag, Crag.kMapName, Server.cragSpawnPoints)
-	end
-	
-	// It is possible there was not an available tower if the map is not designed properly.
+    hive:SetFirstLogin()
+    hive:SetInfestationFullyGrown()
+    
+    // It is possible there was not an available tower if the map is not designed properly.
     if tower then
         CreateCysts(hive, tower, self:GetTeamNumber())
     end
     
     return tower, hive
-    
-end
-
-
-function AlienTeam:OnResetComplete()
-	
-	// Try to destroy the local powernode, if we can find one.
-	// Mr P hates this :]
-	if GetGamerules():GetGameState() ~= kGameState.PreGame then
-		local initialTechPoint = self:GetInitialTechPoint()
-		for index, powerPoint in ientitylist(Shared.GetEntitiesWithClassname("PowerPoint")) do
-		
-			if powerPoint:GetLocationName() == initialTechPoint:GetLocationName() then
-				powerPoint:SetConstructionComplete()
-				powerPoint:Kill(nil, nil, powerPoint:GetOrigin())
-			end
-			
-		end
-	end
     
 end
 
@@ -688,18 +599,16 @@ function AlienTeam:Update(timePassed)
     PlayingTeam.Update(self, timePassed)
     
     self:UpdateTeamAutoHeal(timePassed)
-    //UpdateEggGeneration(self)
-    //UpdateEggCount(self)
-    //UpdateAlienSpectators(self)
-    //self:UpdateBioMassLevel()
+    UpdateEggGeneration(self)
+    UpdateEggCount(self)
+    UpdateAlienSpectators(self)
+    self:UpdateBioMassLevel()
     
-    /* NOT NEEDED IN COMBAT
-	local shellLevel = GetShellLevel(self:GetTeamNumber())  
+    local shellLevel = GetShellLevel(self:GetTeamNumber())  
     for index, alien in ipairs(GetEntitiesForTeam("Alien", self:GetTeamNumber())) do
         alien:UpdateArmorAmount(shellLevel)
         alien:UpdateHealthAmount(math.min(12, self.bioMassLevel), self.maxBioMassLevel)
     end
-	*/
     
     UpdateCystConstruction(self, timePassed)
     
@@ -915,12 +824,12 @@ function AlienTeam:InitTechTree()
     self.techTree:AddSpecial(kTechId.ThreeSpurs, kTechId.TwoSpurs)
     
     // personal upgrades (all alien types)
-    self.techTree:AddBuyNode(kTechId.Carapace, kTechId.Shell, kTechId.None, kTechId.AllAliens)    
-    self.techTree:AddBuyNode(kTechId.Regeneration, kTechId.Shell, kTechId.None, kTechId.AllAliens)
-    self.techTree:AddBuyNode(kTechId.Aura, kTechId.Veil, kTechId.None, kTechId.AllAliens)
-    self.techTree:AddBuyNode(kTechId.Phantom, kTechId.Veil, kTechId.None, kTechId.AllAliens)
-    self.techTree:AddBuyNode(kTechId.Celerity, kTechId.Spur, kTechId.None, kTechId.AllAliens)  
-    self.techTree:AddBuyNode(kTechId.Adrenaline, kTechId.Spur, kTechId.None, kTechId.AllAliens)  
+    self.techTree:AddBuyNode(kTechId.Carapace, kTechId.None, kTechId.None, kTechId.AllAliens)    
+    self.techTree:AddBuyNode(kTechId.Regeneration, kTechId.None, kTechId.None, kTechId.AllAliens)
+    self.techTree:AddBuyNode(kTechId.Aura, kTechId.None, kTechId.None, kTechId.AllAliens)
+    self.techTree:AddBuyNode(kTechId.Phantom, kTechId.None, kTechId.None, kTechId.AllAliens)
+    self.techTree:AddBuyNode(kTechId.Celerity, kTechId.None, kTechId.None, kTechId.AllAliens)  
+    self.techTree:AddBuyNode(kTechId.Adrenaline, kTechId.None, kTechId.None, kTechId.AllAliens)  
 
     // Crag
     self.techTree:AddPassive(kTechId.CragHeal)
@@ -958,30 +867,33 @@ function AlienTeam:InitTechTree()
     
     // abilities unlocked by bio mass: 
     
-    // skulk researches
-    self.techTree:AddResearchNode(kTechId.Leap,              kTechId.BioMassFour, kTechId.None, kTechId.AllAliens) 
-    self.techTree:AddResearchNode(kTechId.Xenocide,          kTechId.BioMassNine, kTechId.None, kTechId.AllAliens)
+    // Tier 1 Abilities
+    self.techTree:AddUpgradeNode(kTechId.Leap,              kTechId.Hive, kTechId.None) 
+    self.techTree:AddUpgradeNode(kTechId.Xenocide,          kTechId.Hive, kTechId.None)
     
     // gorge researches
-    self.techTree:AddBuyNode(kTechId.BabblerAbility,        kTechId.None)
-    self.techTree:AddBuyNode(kTechId.BabblerEgg,                kTechId.None)
-    self.techTree:AddResearchNode(kTechId.BileBomb,              kTechId.BioMassThree, kTechId.None, kTechId.AllAliens)
-    self.techTree:AddResearchNode(kTechId.WebTech,                   kTechId.BioMassFive, kTechId.None, kTechId.AllAliens)
-    self.techTree:AddBuyNode(kTechId.Web,        kTechId.WebTech)
+    self.techTree:AddBuyNode(kTechId.BabblerAbility,        kTechId.Hive)
+    self.techTree:AddBuyNode(kTechId.BabblerEgg,                kTechId.Hive)
+    //self.techTree:AddResearchNode(kTechId.BileBomb,              kTechId.Hive, kTechId.None)
+   // self.techTree:AddUpgradeNode(kTechId.Web,                   kTechId.None, kTechId.None)
+    self.techTree:AddBuyNode(kTechId.Web,        kTechId.Hive)
     
+	self.techTree:AddUpgradeNode(kTechId.BileBomb,            kTechId.Hive,              kTechId.None)
+
+	
     // lerk researches
-    self.techTree:AddResearchNode(kTechId.Umbra,               kTechId.BioMassFour, kTechId.None, kTechId.AllAliens) 
-    self.techTree:AddResearchNode(kTechId.Spores,              kTechId.BioMassSix, kTechId.None, kTechId.AllAliens)
+    self.techTree:AddUpgradeNode(kTechId.Umbra,               kTechId.Hive, kTechId.None) 
+    self.techTree:AddUpgradeNode(kTechId.Spores,              kTechId.Hive, kTechId.None)
     
     // fade researches
-    self.techTree:AddResearchNode(kTechId.MetabolizeEnergy,        kTechId.BioMassThree, kTechId.None, kTechId.AllAliens) 
-    self.techTree:AddResearchNode(kTechId.MetabolizeHealth,            kTechId.BioMassFive, kTechId.MetabolizeEnergy, kTechId.AllAliens)
-    self.techTree:AddResearchNode(kTechId.Stab,              kTechId.BioMassSeven, kTechId.None, kTechId.AllAliens)
+    self.techTree:AddUpgradeNode(kTechId.MetabolizeEnergy,        kTechId.Hive, kTechId.None) 
+    self.techTree:AddUpgradeNode(kTechId.MetabolizeHealth,            kTechId.Hive, kTechId.None)
+    self.techTree:AddUpgradeNode(kTechId.Stab,              kTechId.Hive, kTechId.None)
     
     // onos researches
-    self.techTree:AddResearchNode(kTechId.Charge,            kTechId.BioMassTwo, kTechId.None, kTechId.AllAliens)
-    self.techTree:AddResearchNode(kTechId.BoneShield,        kTechId.BioMassFive, kTechId.None, kTechId.AllAliens)
-    self.techTree:AddResearchNode(kTechId.Stomp,             kTechId.BioMassEight, kTechId.None, kTechId.AllAliens)      
+	self.techTree:AddUpgradeNode(kTechId.Charge,        kTechId.Hive, kTechId.None)
+    self.techTree:AddUpgradeNode(kTechId.BoneShield,        kTechId.Hive, kTechId.None)
+    self.techTree:AddUpgradeNode(kTechId.Stomp,             kTechId.Hive, kTechId.None)      
 
     // gorge structures
     self.techTree:AddBuildNode(kTechId.GorgeTunnel)

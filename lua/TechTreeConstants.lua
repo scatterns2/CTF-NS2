@@ -53,14 +53,11 @@ kTechId = createTechIdEnum({
     /////////////
     
     // Marine classes + spectators
-    'Marine', 'Exo', 'MarineCommander', 'JetpackMarine', 'Spectator', 'AlienSpectator',
+    'Marine', 'Exo','MarineCommander', 'JetpackMarine', 'Spectator', 'AlienSpectator',
     
     // Marine alerts (specified alert sound and text in techdata if any)
     'MarineAlertAcknowledge', 'MarineAlertNeedMedpack', 'MarineAlertNeedAmmo', 'MarineAlertNeedOrder', 'MarineAlertHostiles', 'MarineCommanderEjected', 'MACAlertConstructionComplete',    
     'MarineAlertSentryFiring', 'MarineAlertCommandStationUnderAttack',  'MarineAlertSoldierLost', 'MarineAlertCommandStationComplete',
-	
-	--combat
-	'kCommandStationNeedsRepairs', 'kCommandStationHealed', 'kCommandStation75', 'kCommandStation50', 'kCommandStation25', 'kCommandStation10', 'kCommandStation5',
     
     'MarineAlertInfantryPortalUnderAttack', 'MarineAlertSentryUnderAttack', 'MarineAlertStructureUnderAttack', 'MarineAlertExtractorUnderAttack', 'MarineAlertSoldierUnderAttack',
     
@@ -80,7 +77,7 @@ kTechId = createTechIdEnum({
     // Weapon tech
     'AdvancedWeaponry', 'ShotgunTech', 'HeavyRifleTech', 'DetonationTimeTech', 'FlamethrowerRangeTech', 'GrenadeLauncherTech', 'FlamethrowerTech', 'FlamethrowerAltTech', 'WelderTech', 'MinesTech',
     'GrenadeTech', 'ClusterGrenade', 'ClusterGrenadeProjectile', 'GasGrenade', 'GasGrenadeProjectile', 'PulseGrenade', 'PulseGrenadeProjectile',
-    'DropWelder', 'DropMines', 'DropShotgun', 'DropGrenadeLauncher', 'DropFlamethrower',
+    'DropWelder', 'DropMines', 'DropShotgun', 'DropGrenadeLauncher', 'DropFlamethrower', 'DropHeavyRifle',
     
     // Marine buys
     'FlamethrowerAlt',
@@ -189,7 +186,6 @@ kTechId = createTechIdEnum({
     'AlienAlertLifeformUnderAttack', 'AlienAlertGorgeBuiltHarvester', 'AlienCommanderEjected',
     'AlienAlertOrderComplete',
     'AlienAlertNotEnoughResources', 'AlienAlertResearchComplete', 'AlienAlertManufactureComplete', 'AlienAlertUpgradeComplete', 'AlienAlertHiveComplete',
-	'kHiveNeedsRepairs', 'kHiveHealed', 'kHive75', 'kHive50', 'kHive25', 'kHive10', 'kHive5',
     
     // Pheromones
     'ThreatMarker', 'LargeThreatMarker', 'NeedHealingMarker', 'WeakMarker', 'ExpandingMarker',
@@ -209,48 +205,10 @@ kTechId = createTechIdEnum({
     
     'GameStarted',
     
-    'DeathTrigger',
-	
-	// Combat Stuff 
-	"LayLaserMines", 
-	"MarineStructureAbility", 
-	"Cannon",
-	"Devour",
-	"Speed1", 
-	"Health1", 
-	"Resupply", 
-	"LaserMine",
-	"WeaponCache",
-	"Knife",
-	"BabblerBombAbility",
-	"BabblerBomb",
-	"LightMachineGun",
-	"Revolver",
-	"SporeMineAbility",
-    "SporeMine",
-	"AcidRocket",
-	
-	//Capture Point Alerts
-	"AliensCappedPointA",
-	"AliensCappedPointB",
-	"AliensCappedPointC",
-	"AliensCappingPointA",
-	"AliensCappingPointB",
-	"AliensCappingPointC",
-	"MarinesCappedPointA",
-	"MarinesCappedPointB",
-	"MarinesCappedPointC",
-	"MarinesCappingPointA",
-	"MarinesCappingPointB",
-	"MarinesCappingPointC",
-	
-	//Classes
-	
-	"Medic",
-	"Assault",
-	"Scout",
-	"Engineer",
-	"Flag",
+    'DeathTrigger', 
+
+    // Mod Constants
+    'MarineStructureAbility','Katana','HeavyMachineGun', 'Flag','HealGun',
 	
 
     // Maximum index

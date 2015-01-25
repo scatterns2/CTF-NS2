@@ -33,13 +33,6 @@ PlayingTeam.kResearchDisplayTime = 40
  * spawnEntity is the name of the map entity that will be created by default
  * when a player is spawned.
  */
- 
- local networkVars = {
-
-	numFlagsCaptured = "integer (0 to 99)",
-
-}
- 
 function PlayingTeam:Initialize(teamName, teamNumber)
 
     InitMixin(self, TeamDeathMessageMixin)
@@ -80,9 +73,7 @@ function PlayingTeam:Initialize(teamName, teamNumber)
     self.techIdCount = {}
 
     self.eventListeners = {}
-    
-    self.commandStructure = nil
-    self.numFlagsCaptured = 0
+
 end
 
 function PlayingTeam:AddListener( event, func )
@@ -97,12 +88,6 @@ function PlayingTeam:AddListener( event, func )
     table.insert( listeners, func )
 
     //DebugPrint( 'event %s has %d listeners', event, #self.eventListeners[event] )
-
-end
-
-function PlayingTeam:GetDefaultSpawnMapName()
-
-	return self.respawnEntity
 
 end
 
@@ -170,8 +155,6 @@ function PlayingTeam:OnInitialized()
     self.lastCommPingPosition = Vector(0,0,0)
     
     self.supplyUsed = 0
-	
-	self:ResetUpgradeCounts()
 
 end
 
@@ -195,9 +178,6 @@ function PlayingTeam:ResetTeam()
         player:SetResources(ConditionalValue(self:GetTeamNumber() == kTeam1Index, kMarineInitialIndivRes, kAlienInitialIndivRes))
         
     end
-	
-	self:ResetUpgradeCounts()
-    self.commandStructure = commandStructure
     
     return commandStructure
     
@@ -206,8 +186,6 @@ end
 function PlayingTeam:GetInfoEntity()
     return Shared.GetEntity(self.teamInfoEntityId)
 end
-
-
 
 function PlayingTeam:OnResetComplete()
 end
@@ -231,8 +209,10 @@ end
 
 function PlayingTeam:Reset()
 
-    self:OnInitialized()    
+    self:OnInitialized()
+    
     Team.Reset(self)
+
     Server.SendNetworkMessage( "Reset", {}, true )
 
 end
@@ -281,102 +261,7 @@ function PlayingTeam:InitTechTree()
     self.techTree:AddOrder(kTechId.SetTarget)
     
     self.techTree:AddUpgradeNode(kTechId.TransformResources)
-	
-	// Unlock (almost) all tech. The new upgrade system is used to actually control tech now.
-	local dontResearchTech = {}
-	dontResearchTech[kTechId.Weapons1] = true
-	dontResearchTech[kTechId.Armor1] = true
-	dontResearchTech[kTechId.Weapons2] = true
-	dontResearchTech[kTechId.Armor2] = true
-	dontResearchTech[kTechId.Weapons3] = true
-	dontResearchTech[kTechId.Armor3] = true
-	self.techTree:ResearchAll(dontResearchTech)
     
-end
-
-function PlayingTeam:ResetUpgradeCounts()
-
-	if self.upgradeCounts == nil then
-		self.upgradeCounts = {}
-	end
-	table.clear(self.upgradeCounts)
-
-	// Populate upgrade counts data structure
-    // Only include upgrades that need to be counted for hard cap
-    for i, upgrade in ipairs(kAllCombatUpgrades) do
-		local newUpgrade = _G[upgrade]()
-		newUpgrade:Initialize()
-		if newUpgrade:GetHardCapScale() > 0 and newUpgrade:GetIsAllowedForTeam(self:GetTeamNumber()) then
-    		local countTable = BuildHardCapUpdateMessage(newUpgrade:GetId(), newUpgrade:GetHardCapScale())
-    		self.upgradeCounts[newUpgrade:GetId()] = countTable
-    	end
-    end
-
-end
-
-function PlayingTeam:GetUpgradeCounts()
-    return self.upgradeCounts
-end
-
-function PlayingTeam:UpdateUpgradeCounts()
-
-	// Get the number of players on the team who have the upgrade
-	local teamPlayers = GetEntitiesForTeam("Player", self:GetTeamNumber())
-	local numInTeam = #teamPlayers
-	
-	// Store the old upgrade counts and create a new table
-	local oldUpgradeCounts = table.clone(self.upgradeCounts)
-	
-	// Reset the upgrade counts
-	for upgradeId, upgradeCountData in pairs(self.upgradeCounts) do
-	
-		upgradeCountData.Count = 0
-		upgradeCountData.IsHardCapped = false
-		
-		// Recalculate the upgrade counts.
-		for index, teamPlayer in ipairs(teamPlayers) do
-			
-			if teamPlayer:GetHasUpgrade(upgradeId) then
-				upgradeCountData.Count = upgradeCountData.Count + 1
-			end
-			
-		end
-		
-		if upgradeCountData.Count > numInTeam * upgradeCountData.HardCapScale then
-			upgradeCountData.IsHardCapped = true
-		end
-		
-		// Notify all players about the count change
-		if 	upgradeCountData.Count ~= oldUpgradeCounts[upgradeId].Count or
-			upgradeCountData.IsHardCapped ~= oldUpgradeCounts[upgradeId].IsHardCapped then
-		
-			for index, teamPlayer in ipairs(teamPlayers) do
-				// SERVER SIDE
-				teamPlayer:UpdateHardCap(upgradeCountData.UpgradeId, 
-									     upgradeCountData.HardCapScale, 
-										 upgradeCountData.IsHardCapped, 
-										 upgradeCountData.Count)
-			
-				// CLIENT SIDE
-				//Shared.Message("Sending hardcap update message for " .. upgrade:GetUpgradeTitle())
-				Server.SendNetworkMessage(teamPlayer, "HardCapUpdate", upgradeCountData, true )
-			end
-			
-		end
-		
-	end		
-	
-	return true
-
-end
-
-function PlayingTeam:UpdateUpgradeCountsForPlayer(player)
-
-	//Shared.Message("Sending hardcap update messages to " .. player:GetName())
-	for upgradeId, upgradeCountData in pairs(self.upgradeCounts) do
-		Server.SendNetworkMessage(player, "HardCapUpdate", upgradeCountData, true )
-	end
-	
 end
 
 // Returns marine or alien type
@@ -642,25 +527,29 @@ function PlayingTeam:GetTotalTeamResources()
 end
 
 function PlayingTeam:GetHasTeamLost()
-	
-	// Don't bother with the original - we just set our own logic here.
-	// You can lose with cheats on (testing purposes)
-	if(GetGamerules():GetGameStarted()) then
-	
-		// Team can't respawn or last Command Station or Hive destroyed
-		local numCommandStructures = self:GetNumCommandStructures()
-		
-		if  ( numCommandStructures == 0 ) or
-			( self:GetNumPlayers() == 0 ) then
-			
-			return true
-			
-		end
-			
-	end
 
-	return false
+    PROFILE("PlayingTeam:GetHasTeamLost")
 
+    if GetGamerules():GetGameStarted() and not Shared.GetCheatsEnabled() then
+    
+        // Team can't respawn or last Command Station or Hive destroyed
+        local activePlayers = self:GetHasActivePlayers()
+        local abilityToRespawn = self:GetHasAbilityToRespawn()
+        local numAliveCommandStructures = self:GetNumAliveCommandStructures()
+        
+        if  (not activePlayers and not abilityToRespawn) or
+            (numAliveCommandStructures == 0) or
+            (self:GetNumPlayers() == 0) or 
+            self:GetHasConceded() then
+            
+            return true
+            
+        end
+        
+    end
+    
+    return false
+    
 end
 
 local function SpawnResourceTower(self, techPoint)
@@ -702,42 +591,6 @@ local function SpawnResourceTower(self, techPoint)
     
 end
 
-function PlayingTeam:SpawnBaseFlag(self, techPoint)
-
-    local techPointOrigin = Vector(techPoint:GetOrigin())
-    
-    local closestPoint = nil
-    local closestPointDistance = 0
-    
-    for index, current in ientitylist(Shared.GetEntitiesWithClassname("ResourcePoint")) do
-    
-        // The resource point and tech point must be in locations that share the same name.
-        local sameLocation = techPoint:GetLocationName() == current:GetLocationName()
-        if sameLocation then
-        
-            local pointOrigin = Vector(current:GetOrigin())
-            local distance = (pointOrigin - techPointOrigin):GetLength()
-            
-            if current:GetAttached() == nil and closestPoint == nil or distance < closestPointDistance then
-            
-                closestPoint = current
-                closestPointDistance = distance
-                
-            end
-            
-        end
-        
-    end
-    
-    // Now spawn appropriate resource tower there
-    if closestPoint ~= nil then
-        return closestPoint:SpawnFlagForTeam(self) 
-    end
-    
-    return nil
-    
-end
-
 /**
  * Spawn hive or command station at nearest empty tech point to specified team location.
  * Does nothing if can't find any.
@@ -757,31 +610,22 @@ local function SpawnCommandStructure(techPoint, teamNumber)
     
 end
 
-// Override this in AlienTeam/MarineTeam, but this is a fallback.
-function PlayingTeam:ShouldSpawnCommandStructure()
-	return true
-end
-
+-- Note: Spawn Initial Structures function edited 
+-- to spawn flag instead of tower
 function PlayingTeam:SpawnInitialStructures(techPoint)
 
     assert(techPoint ~= nil)
     
-    // Spawn tower at nearest unoccupied resource point.
-	// COMBAT: No resource towers.
-
-	local flag = self:SpawnBaseFlag(self, techPoint)
+    --  CTF Mod: Spawn flag at nearest unoccupied resource point.
+    local flag = self:SpawnBaseFlag(self, techPoint)
     if not flag then
         Print("Warning: Failed to spawn a Base Flag for tech point in location: " .. techPoint:GetLocationName())
     end
-	
-	local commandStructure = nil
-	
-    // Spawn hive/command station at team location.
-	if self:ShouldSpawnCommandStructure() then
-		commandStructure = SpawnCommandStructure(techPoint, self:GetTeamNumber())
-	end
     
-    return tower, commandStructure
+    // Spawn hive/command station at team location.
+    local commandStructure = SpawnCommandStructure(techPoint, self:GetTeamNumber())
+    
+    return flag, commandStructure
     
 end
 
@@ -797,64 +641,19 @@ function PlayingTeam:GetIsMarineTeam()
     return false    
 end
 
-// Call with origin and angles, or pass nil to have them determined from team location and spawn points.
-function PlayingTeam:RespawnPlayer(player, origin, angles)
-
-    local success = false
-    local initialTechPoint = Shared.GetEntity(self.initialTechPointId)
-    
-    if origin ~= nil  then
-        if angles == nil then
-                // Orient player towards tech point
-            local lookAtPoint = initialTechPoint:GetOrigin() + Vector(0, 5, 0)
-            local toTechPoint = GetNormalizedVector(lookAtPoint - origin)
-            angles = Angles(GetPitchFromVector(toTechPoint), GetYawFromVector(toTechPoint), 0)
-        end
-        success = Team.RespawnPlayer(self, player, origin, angles)
-    elseif initialTechPoint ~= nil then
-    
-        // Compute random spawn location
-        local capsuleHeight, capsuleRadius = player:GetTraceCapsule()
-        local spawnOrigin = GetRandomSpawnForCapsule(capsuleHeight, capsuleRadius, initialTechPoint:GetOrigin(), 2, 15, EntityFilterAll())
-        
-        if not spawnOrigin then
-            spawnOrigin = initialTechPoint:GetOrigin() + Vector(2, 0.2, 2)
-        end
-        
-        // Orient player towards tech point
-        local lookAtPoint = initialTechPoint:GetOrigin() + Vector(0, 5, 0)
-        local toTechPoint = GetNormalizedVector(lookAtPoint - spawnOrigin)
-        success = Team.RespawnPlayer(self, player, spawnOrigin, Angles(GetPitchFromVector(toTechPoint), GetYawFromVector(toTechPoint), 0))
-        
-    else
-        Print("PlayingTeam:RespawnPlayer(): No initial tech point.")
-    end
-    
-    return success
-    
-end
-
-function PlayingTeam:OnJoinTeam(newPlayer)
-	-- Do nothing, suitable for inheriting
-end
-
 /**
  * Transform player to appropriate team respawn class and respawn them at an appropriate spot for the team.
  * Pass nil origin/angles to have spawn entity chosen.
  */
-function PlayingTeam:ReplaceRespawnPlayer(player, origin, angles, mapName, extraValues)
+function PlayingTeam:ReplaceRespawnPlayer(player, origin, angles, mapName)
 
-    local spawnMapName = self:GetDefaultSpawnMapName()
+    local spawnMapName = self.respawnEntity
     
     if mapName ~= nil then
         spawnMapName = mapName
     end
     
-    local newPlayer = player:Replace(spawnMapName, self:GetTeamNumber(), false, origin, extraValues)
-	-- Hax to stop bots crashing the server
-	newPlayer:SetTeamNumber(self:GetTeamNumber())
-	-- Add entity to team, add/remove tech from tech tree, etc.
-    GetGamerules():OnEntityCreate(newPlayer)
+    local newPlayer = player:Replace(spawnMapName, self:GetTeamNumber(), false, origin)
     
     // If we fail to find a place to respawn this player, put them in the Team's
     // respawn queue.
@@ -863,21 +662,7 @@ function PlayingTeam:ReplaceRespawnPlayer(player, origin, angles, mapName, extra
         newPlayer = newPlayer:Replace(newPlayer:GetDeathMapName())
         self:PutPlayerInRespawnQueue(newPlayer)
         
-    else
-		-- Re-apply non lifeform upgrades here.
-		if HasMixin(newPlayer, "CombatUpgrade") then
-			--newPlayer:ReapplyUpgrades()
-			for index, upgrade in ipairs(newPlayer:GetActiveUpgrades()) do
-				if (not upgrade:CausesEntityChange()) and upgrade:CanApplyUpgrade(newPlayer) == "" then
-					upgrade:OnAdd(newPlayer, upgrade.hudSlot ~= kPrimaryWeaponSlot)
-				end			
-			end
-		end
-		
-		if newPlayer.SetSpawnProtect then
-			newPlayer:SetSpawnProtect()
-		end
-	end
+    end
     
     newPlayer:ClearGameEffects()
     if HasMixin(newPlayer, "Upgradable") then
@@ -902,6 +687,36 @@ function PlayingTeam:ReplaceRespawnAllPlayers()
     
 end
 
+// Call with origin and angles, or pass nil to have them determined from team location and spawn points.
+function PlayingTeam:RespawnPlayer(player, origin, angles)
+
+    local success = false
+    local initialTechPoint = Shared.GetEntity(self.initialTechPointId)
+    
+    if origin ~= nil and angles ~= nil then
+        success = Team.RespawnPlayer(self, player, origin, angles)
+    elseif initialTechPoint ~= nil then
+    
+        // Compute random spawn location
+        local capsuleHeight, capsuleRadius = player:GetTraceCapsule()
+        local spawnOrigin = GetRandomSpawnForCapsule(capsuleHeight, capsuleRadius, initialTechPoint:GetOrigin(), 2, 15, EntityFilterAll())
+        
+        if not spawnOrigin then
+            spawnOrigin = initialTechPoint:GetOrigin() + Vector(2, 0.2, 2)
+        end
+        
+        // Orient player towards tech point
+        local lookAtPoint = initialTechPoint:GetOrigin() + Vector(0, 5, 0)
+        local toTechPoint = GetNormalizedVector(lookAtPoint - spawnOrigin)
+        success = Team.RespawnPlayer(self, player, spawnOrigin, Angles(GetPitchFromVector(toTechPoint), GetYawFromVector(toTechPoint), 0))
+        
+    else
+        Print("PlayingTeam:RespawnPlayer(): No initial tech point.")
+    end
+    
+    return success
+    
+end
 
 //Up to implementing child classes to override and calculate reutrn value
 function PlayingTeam:GetTotalInRespawnQueue()
@@ -986,19 +801,20 @@ function PlayingTeam:Update(timePassed)
 
     PROFILE("PlayingTeam:Update")
     
-    //self:UpdateTechTree()
+    self:UpdateTechTree()
     
     self:UpdateVotes()
 
     if GetGamerules():GetGameStarted() then
 
-        self:UpdateSpawnWave(timePassed)
-        
+        self:UpdateMinResTick()
+
         if #gServerBots > 0 or #GetEntitiesWithMixinForTeam("PlayerHallucination", self:GetTeamNumber()) > 0 then
             self:GetTeamBrain():Update(timePassed)
         elseif self.brain then        
             self.brain = nil        
         end
+
 
     else
 
@@ -1013,7 +829,7 @@ end
 
 function PlayingTeam:UpdateMinResTick()
 
-	PROFILE("PlayingTeam:UpdateMinResTick")
+    PROFILE("PlayingTeam:UpdateMinResTick")
 
     if not self.timeLastMinResUpdate or self.timeLastMinResUpdate + kResourceTowerResourceInterval * 2 <= Shared.GetTime() then
     
@@ -1297,127 +1113,4 @@ function PlayingTeam:OnEntityChange(oldId, newId)
         self.brain:OnEntityChange( oldId, newId )
     end
 
-end
-
--- Random spawning. This logic only comes into effect when there is no command chair for a team.
-function PlayingTeam:GetRandomSpawnPoint(player)
-
-    local numSpawnPoints = table.maxn(Server.combatSpawnList)
-    
-    // Start with random spawn point then move up from there
-    local baseSpawnIndex = NetworkRandomInt(1, numSpawnPoints)
-
-    for i = 1, numSpawnPoints do
-
-        local spawnPointIndex = ((baseSpawnIndex + i) % numSpawnPoints) + 1
-        local spawnPoint = Server.combatSpawnList[spawnPointIndex]:GetOrigin()
-       
-        if player:SpaceClearForEntity(spawnPoint) then
-			local nearbyEnemies = GetEntitiesForTeamWithinRange("ScriptActor", GetEnemyTeamNumber(self:GetTeamNumber()), spawnPoint, kDontSpawnNearEnemyRange)
-			if #nearbyEnemies == 0 then
-				return spawnPoint
-			end
-        end
-            
-    end
-	
-	-- If we failed to find a spawn point on the first pass, try one more time but don't check for nearby enemies.
-	baseSpawnIndex = NetworkRandomInt(1, numSpawnPoints)
-	for i = 1, numSpawnPoints do
-
-        local spawnPointIndex = ((baseSpawnIndex + i) % numSpawnPoints) + 1
-        local spawnPoint = Server.combatSpawnList[spawnPointIndex]:GetOrigin()
-       
-        if player:SpaceClearForEntity(spawnPoint) then
-            return spawnPoint
-        end
-            
-    end
-	
-end
-
-function PlayingTeam:UpdateSpawnWave(deltaTime)
-
-    if GetGamerules():GetGameStarted() then
-			
-		for i, playerId in ipairs(self.respawnQueue) do
-    
-			local playerToSpawn = Shared.GetEntity(playerId)
-			
-			if playerToSpawn ~= nil and playerToSpawn.GetRespawnQueueEntryTime and playerToSpawn:GetRespawnQueueEntryTime() ~= nil then
-			
-				local timeSinceDeath = Shared.GetTime() - playerToSpawn:GetRespawnQueueEntryTime()
-				local timeToSpawn = playerToSpawn:GetTimeToSpawn()
-				
-				// fast spawn when cheats are on
-				if Shared.GetDevMode() then
-				    timeToSpawn = 1
-				end			
-				
-				if timeSinceDeath >  timeToSpawn then
-				
-					playerToSpawn:SetIsRespawning(true)
-					
-					local spawnPoint = nil
-					if self.commandStructure and self.commandStructure:GetId() ~= Entity.invalidId then
-						spawnPoint = self.commandStructure:GetSpawnPoint(playerToSpawn)
-					elseif GetGamerulesInfo():GetGameType() == kCombatGameType.Infection then
-						spawnPoint = self:GetRandomSpawnPoint(playerToSpawn)
-					end
-					
-					if spawnPoint ~= nil then
-					   
-						if Server then
-							if spawnPoint then
-								local respawnMapName = playerToSpawn:GetRespawnMapName(self:GetTeamNumber())
-								local extraValues = playerToSpawn:GetRespawnExtraValues()
-								local success, newPlayer = self:ReplaceRespawnPlayer(playerToSpawn, spawnPoint, playerToSpawn:GetAngles(), respawnMapName, extraValues) 
-								if success then
-									self:RemovePlayerFromRespawnQueue(playerToSpawn)								
- 
-									// Make a nice effect when you spawn.
-									if newPlayer:isa("Marine") or newPlayer:isa("Exo") then
-										newPlayer:TriggerEffects("infantry_portal_spawn")
-									end
-									newPlayer:TriggerEffects("spawnSoundEffects")
-									newPlayer:SetCameraDistance(0)
-									newPlayer.timeToSpawn = nil
-									newPlayer.justRefunded = false
-									//give him spawn Protect (dont set the time here, just that spawn protect is active)
-									
-									break
-								end
-							end
-						end
-					end
-				end
-			end
-        end
-    end
-
-end
-
-
-
-
-function PlayingTeam:AddFlagCapture()
-    self.numFlagsCaptured = self.numFlagsCaptured + 1
-    Print("Team %d, has captured a flag. They now have %d flags captured", self:GetTeamNumber(), self.numFlagsCaptured)
-end
-
-function PlayingTeam:GetNumFlagsCaptured()
-    return self.numFlagsCaptured
-end
-
-function PlayingTeam:GetHasTeamWon()
-
-    PROFILE("PlayingTeam:GetHasTeamWon")
-
-    if GetGamerules():GetGameStarted() /*and not Shared.GetCheatsEnabled()*/ then
-        local numFlags = self:GetNumFlagsCaptured()
-        if numFlags == kCaptureWinTotal then            
-            return true 
-        end
-    end    
-    return false
 end

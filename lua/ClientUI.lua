@@ -13,19 +13,19 @@ ClientUI = { }
 // Below are the rules for what scripts should be active when the local player is on certain teams.
 local kTeamTypes = { "all", kTeamReadyRoom, kTeam1Index, kTeam2Index, kSpectatorIndex }
 local kShowOnTeam = { }
-kShowOnTeam["all"] = { GUIGameEnd = true, GUIScoreboard = true, GUIDeathMessages = true, 
+kShowOnTeam["all"] = { GUIGameEnd = true, GUIFeedback = true, GUIScoreboard = true, GUIDeathMessages = true, 
                        GUIChat = true, GUIVoiceChat = true, GUIMinimapFrame = true, GUIMapAnnotations = true,
                        GUICommunicationStatusIcons = true, GUIUnitStatus = true, GUIDeathScreen = true,
                        GUIStartVoteMenu = true, GUIVoteMenu = true }
 
-kShowOnTeam[kTeamReadyRoom] = { GUIReadyRoomOrders = true }
-kShowOnTeam[kTeam1Index] = {}
-kShowOnTeam[kTeam2Index] = {}
+kShowOnTeam[kTeamReadyRoom] = { GUIReadyRoomOrders = true, GUIRequestMenu = true }
+kShowOnTeam[kTeam1Index] = {  }
+kShowOnTeam[kTeam2Index] = { GUIAlienSpectatorHUD = true }
 kShowOnTeam[kSpectatorIndex] = { GUISpectator = true }
 
 local kBothAlienAndMarine = { GUICrosshair = true, GUINotifications = true, GUIDamageIndicators = true, GUIWorldText = true,
-                              GUIPing = true, GUIWaitingForAutoTeamBalance = true, GUIGameTime = true, GUISpectatorHUD = true, }
-                              
+                              GUIPing = true, GUIWaitingForAutoTeamBalance = true, GUITechMap = true, GUITipVideo = true }
+
 for n, e in pairs(kBothAlienAndMarine) do
 
     kShowOnTeam[kTeam1Index][n] = e
@@ -41,15 +41,16 @@ end
 local kShowAsClass = { }
 kShowAsClass["Marine"] = { ["Hud/Marine/GUIMarineHUD"] = true, GUIPoisonedFeedback = true, GUIPickups = true,
                            GUISensorBlips = true, GUIObjectiveDisplay = true, GUIProgressBar = true, GUIRequestMenu = true,
-                           GUIWaypoints = true, GUIExperienceBar = true }
+                           GUIWaypoints = true, }
 kShowAsClass["JetpackMarine"] = { GUIJetpackFuel = true }
-kShowAsClass["Exo"] = { GUIExoThruster = true, ["Hud/Marine/GUIMarineHUD"] = true, ["Hud/Marine/GUIExoHUD"] = true, GUIProgressBar = true, GUIRequestMenu = true, GUIWaypoints = true, GUIExperienceBar = true }
-kShowAsClass["MarineSpectator"] = { GUIRequestMenu = true, GUIExperienceBar = true }
+kShowAsClass["Exo"] = { GUIExoThruster = true, ["Hud/Marine/GUIMarineHUD"] = true, ["Hud/Marine/GUIExoHUD"] = true, GUIProgressBar = true, GUIRequestMenu = true, GUIWaypoints = true, GUIExoEject = true }
+kShowAsClass["MarineSpectator"] = { GUIRequestMenu = true }
 kShowAsClass["Alien"] = { GUIObjectiveDisplay = true, GUIProgressBar = true, GUIRequestMenu = true, GUIWaypoints = true, GUIAlienHUD = true,
-                          GUIEggDisplay = true, GUIRegenerationFeedback = true, GUIExperienceBar = true, GUIAuraDisplay = true }
-kShowAsClass["AlienSpectator"] = { GUIRequestMenu = true, GUIExperienceBar = true }
-kShowAsClass["Onos"] = { GUIDevour = true }
-kShowAsClass["DevouredPlayer"] = { GUIDevour = true }
+                          GUIEggDisplay = true, GUIRegenerationFeedback = true,  GUIUpgradeChamberDisplay = true, GUIAuraDisplay = true,  }
+kShowAsClass["AlienSpectator"] = { GUIRequestMenu = true }
+kShowAsClass["Commander"] = { GUICommanderOrders = true }
+kShowAsClass["MarineCommander"] = { GUICommanderTutorial = true, GUISensorBlips = true, GUIDistressBeacon = true }
+kShowAsClass["AlienCommander"] = { GUICommanderTutorial = true, GUIEggDisplay = true, GUICommanderPheromoneDisplay = true, GUIBioMassDisplay = true }
 kShowAsClass["ReadyRoomPlayer"] = { }
 kShowAsClass["TeamSpectator"] = { }
 kShowAsClass["Spectator"] = { }
@@ -59,6 +60,7 @@ kShowAsClass["Spectator"] = { }
 local kMiscPreloads = {
     'Babbler',
     'GUIActionIcon',
+    'GUIAlienBuyMenu',
     'GUIAlienTeamMessage',
     'GUIAnimatedScript',
     'GUIBabblerMoveIndicator',
@@ -69,16 +71,15 @@ local kMiscPreloads = {
     'GUICommanderLogout',
     'GUICommanderManager',
     'GUICommanderTooltip',
-	'GUIDevour',
     'GUIDial',
     'GUIEvolveHelp',
-	'GUIExperienceBar',
     'GUIFadeBlinkHelp',
     'GUIFadeShadowStepHelp',
     'GUIGorgeHealHelp',
     'GUIHotkeyIcons',
     'GUIIncrementBar',
     'GUIList',
+    'GUIMarineBuyMenu',
     'GUIMarineTeamMessage',
     'GUIMinimapButtons',
     'GUIParticleSystem',
@@ -96,14 +97,7 @@ local kMiscPreloads = {
     'tweener/Tweener',
     'GUICommanderButtonsMarines',
     'GUICommanderButtons',
-    'Hud/Commander/MarineGhostModel',
-    'GUIObjectiveScoreboard',
-    'GUIObjectiveScoreboardCapture',
-    'GUIBuyHelp',
-    'GUIDevour',
-    'GUIExperienceBar',
-    'GUIMarineBuildMenu',
-    
+    'Hud/Commander/MarineGhostModel'
 
 }
 
@@ -155,9 +149,9 @@ local function RemoveScripts(forPlayer)
                     if kShowOnTeam[teamType][name] then
                     
                         shouldExist = true
-						if MainMenu_GetIsOpened() and teamType ~= "all" then
-							shouldExist = false
-						end
+                        if MainMenu_GetIsOpened() and teamType ~= "all" then
+                            shouldExist = false
+                        end
 
                         break
                         
@@ -180,12 +174,9 @@ local function RemoveScripts(forPlayer)
                             shouldExist = true
                             if CheckPlayerIsOnTeam(forPlayer, kTeamReadyRoom) then
                                 shouldExist = kShowOnTeam[kTeamReadyRoom][name] and not MainMenu_GetIsOpened() or kShowOnTeam["all"][name]
-							// Special logic for devoured players too
-							elseif forPlayer:isa("DevouredPlayer") then
-								shouldExist = kShowAsClass["DevouredPlayer"][name] or kShowOnTeam["all"][name]
                             elseif MainMenu_GetIsOpened() and not kShowOnTeam["all"][name] then
-								shouldExist = false
-							end
+                                shouldExist = false
+                            end
                             
                             break
                             
@@ -235,8 +226,7 @@ local function AddScripts(forPlayer)
         for t = 1, #kTeamTypes do
         
             local teamType = kTeamTypes[t]
-			// Devoured players ignore team-specific HUD.
-            if CheckPlayerIsOnTeam(forPlayer, teamType) and not forPlayer:isa("DevouredPlayer") then
+            if CheckPlayerIsOnTeam(forPlayer, teamType) then
             
                 for name, exists in pairs(kShowOnTeam[teamType]) do
                 
@@ -263,11 +253,8 @@ local function AddScripts(forPlayer)
                     local allowed = exists
                     if CheckPlayerIsOnTeam(forPlayer, kTeamReadyRoom) then
                         allowed = allowed and (not MainMenu_GetIsOpened() and kShowOnTeam[kTeamReadyRoom][name]) or kShowOnTeam["all"][name]
-					// Special logic for devoured players too
-					elseif forPlayer:isa("DevouredPlayer") then
-						allowed = allowed and (kShowAsClass["DevouredPlayer"][name] or kShowOnTeam["all"][name])
                     elseif MainMenu_GetIsOpened() and not kShowOnTeam["all"][name] then
-						shouldExist = false
+                        shouldExist = false
                     end
                     
                     if allowed and scripts[name] == nil then
@@ -282,42 +269,6 @@ local function AddScripts(forPlayer)
             end
             
         end
-       
-        // different gameRules GUIs
-        local gameRulesGuis = {}
-        
-        local gameType = GetGamerulesInfo():GetGameType()
-        if gameType == kCombatGameType.CombatDeathmatch then
-        
-            if CheckPlayerIsOnTeam(forPlayer, kTeam1Index) or  CheckPlayerIsOnTeam(forPlayer, kTeam2Index) then   
-                gameRulesGuis = {  
-                                "GUIObjectiveScoreboard"
-                                }
-            end
-            
-        elseif gameType == kCombatGameType.CombatCapture then
-        
-            if CheckPlayerIsOnTeam(forPlayer, kTeam1Index) or  CheckPlayerIsOnTeam(forPlayer, kTeam2Index) then   
-                gameRulesGuis = {  
-                                "GUIObjectiveScoreboardCapture"
-                                }
-            end        
-               
-	    elseif gameType == kCombatGameType.CombatCTF then
-        
-            if CheckPlayerIsOnTeam(forPlayer, kTeam1Index) or  CheckPlayerIsOnTeam(forPlayer, kTeam2Index) then   
-                gameRulesGuis = {  
-                                "GUIObjectiveScoreboard"
-                                }
-            end        
-        
-        end
-        
-        for i, name in ipairs(gameRulesGuis) do
-            scripts[name] = GetGUIManager():CreateGUIScript(name)
-            NotifyListenersOfScriptCreation(name, scripts[name])
-        end
-        
         
     end
     
